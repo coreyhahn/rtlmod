@@ -1,4 +1,4 @@
-from rtlmod import UInt
+from rtlmod import UInt, SInt
 
 
 class TestUIntConstruction:
@@ -62,3 +62,68 @@ class TestUIntConstruction:
         u258 = UInt[258]
         x = u258(1 << 258)
         assert x.value == 0
+
+
+class TestSIntConstruction:
+    def test_type_creation(self):
+        s16 = SInt[16]
+        assert s16.width == 16
+        assert s16.signed == True
+
+    def test_positive_value(self):
+        s16 = SInt[16]
+        x = s16(1000)
+        assert x.value == 1000
+
+    def test_negative_value(self):
+        s16 = SInt[16]
+        x = s16(-1)
+        assert x.value == -1
+
+    def test_min_value(self):
+        s16 = SInt[16]
+        x = s16(-32768)
+        assert x.value == -32768
+
+    def test_max_value(self):
+        s16 = SInt[16]
+        x = s16(32767)
+        assert x.value == 32767
+
+    def test_positive_overflow_wraps(self):
+        s16 = SInt[16]
+        x = s16(32768)
+        assert x.value == -32768
+
+    def test_negative_overflow_wraps(self):
+        s16 = SInt[16]
+        x = s16(-32769)
+        assert x.value == 32767
+
+    def test_type_caching(self):
+        assert SInt[16] is SInt[16]
+
+    def test_sint_uint_different(self):
+        assert SInt[8] is not UInt[8]
+
+    def test_equality(self):
+        s16 = SInt[16]
+        assert s16(-1) == s16(-1)
+        assert s16(0) != s16(1)
+
+    def test_wide_signed(self):
+        s258 = SInt[258]
+        x = s258(-1)
+        assert x.value == -1
+
+    def test_wide_signed_max(self):
+        s258 = SInt[258]
+        max_val = (1 << 257) - 1
+        x = s258(max_val)
+        assert x.value == max_val
+
+    def test_wide_signed_min(self):
+        s258 = SInt[258]
+        min_val = -(1 << 257)
+        x = s258(min_val)
+        assert x.value == min_val
