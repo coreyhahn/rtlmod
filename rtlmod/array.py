@@ -5,26 +5,6 @@ from __future__ import annotations
 import numpy as np
 
 
-def _backing_dtype(width: int, signed: bool):
-    """Choose the smallest numpy dtype that fits the given width."""
-    if signed:
-        if width <= 8:
-            return np.int8
-        if width <= 16:
-            return np.int16
-        if width <= 32:
-            return np.int32
-        return np.int64
-    else:
-        if width <= 8:
-            return np.uint8
-        if width <= 16:
-            return np.uint16
-        if width <= 32:
-            return np.uint32
-        return np.uint64
-
-
 class RtlArray:
     """A numpy-backed array with arbitrary bit-width and Verilog masking semantics.
 

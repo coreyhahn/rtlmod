@@ -22,10 +22,32 @@ class Trace:
         return len(self._cycles)
 
     def record(self, **kwargs):
-        """Record one cycle of signal values."""
+        """Record one cycle of signal values.
+
+        On first call, establishes the signal names and types.
+        Subsequent calls must provide the same signals (raises ValueError if not).
+        Use record_dynamic() for traces with varying signal sets (e.g., pipeline traces).
+        """
         if not self._signals:
             self._signals = list(kwargs.keys())
             self._types = {name: type(val) for name, val in kwargs.items()}
+        else:
+            if list(kwargs.keys()) != self._signals:
+                raise ValueError(
+                    f"Signal mismatch: expected {self._signals}, got {list(kwargs.keys())}"
+                )
+        self._cycles.append(dict(kwargs))
+
+    def record_dynamic(self, **kwargs):
+        """Record one cycle, updating signal list to include any new signals."""
+        if not self._signals:
+            self._signals = list(kwargs.keys())
+            self._types = {name: type(val) for name, val in kwargs.items()}
+        else:
+            for name, val in kwargs.items():
+                if name not in self._types:
+                    self._signals.append(name)
+                    self._types[name] = type(val)
         self._cycles.append(dict(kwargs))
 
     def __getitem__(self, index):
@@ -66,12 +88,13 @@ class Trace:
                 writer.writerow(row)
 
     @classmethod
-    def from_csv(cls, path: str, types: dict[str, type]) -> Trace:
+    def from_csv(cls, path: str, types: dict[str, type], fmt: str = 'hex') -> Trace:
         """Load a trace from a CSV file.
 
         Args:
             path: Input CSV file path.
             types: Mapping of signal name to type (e.g. {'a': UInt[8], 'b': SInt[16]}).
+            fmt: Value format used in the CSV - 'hex' (default), 'decimal', or 'binary'.
 
         Returns:
             A new Trace with the loaded data.
@@ -84,9 +107,11 @@ class Trace:
                 kwargs = {}
                 for name, typ in types.items():
                     raw = row[name].strip()
-                    try:
+                    if fmt == 'hex':
                         val = int(raw, 16)
-                    except ValueError:
+                    elif fmt == 'binary':
+                        val = int(raw, 2)
+                    else:
                         val = int(raw)
                     kwargs[name] = typ(val)
                 trace.record(**kwargs)

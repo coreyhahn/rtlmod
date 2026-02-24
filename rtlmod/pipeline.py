@@ -83,5 +83,5 @@ class Pipeline:
         from rtlmod.io.trace import Trace
         trace = Trace()
         for cycle_data in self._trace_data:
-            trace.record(**cycle_data)
+            trace.record_dynamic(**cycle_data)
         return trace

@@ -75,6 +75,36 @@ class TestTraceCSV:
             os.unlink(path)
 
 
+    def test_roundtrip_csv_decimal(self):
+        trace = Trace()
+        u8 = UInt[8]
+        s16 = SInt[16]
+        trace.record(a=u8(100), b=s16(-100))
+        trace.record(a=u8(200), b=s16(200))
+
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False) as f:
+            path = f.name
+        try:
+            trace.to_csv(path, fmt='decimal')
+            loaded = Trace.from_csv(path, types={'a': UInt[8], 'b': SInt[16]}, fmt='decimal')
+            assert loaded[0].a == u8(100)  # not 256 (0x100)
+            assert loaded[0].b == s16(-100)
+            assert loaded[1].a == u8(200)
+            assert loaded[1].b == s16(200)
+        finally:
+            os.unlink(path)
+
+
+class TestTraceValidation:
+    def test_record_signal_mismatch_raises(self):
+        trace = Trace()
+        u8 = UInt[8]
+        trace.record(x=u8(1))
+        import pytest
+        with pytest.raises(ValueError, match="Signal mismatch"):
+            trace.record(y=u8(2))
+
+
 class TestTraceIteration:
     def test_iterate(self):
         trace = Trace()
