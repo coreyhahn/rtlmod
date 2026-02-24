@@ -100,6 +100,34 @@ class _ArithmeticMixin:
             return type(self)(-self._value)
         return SInt[self._width](-self._to_int())
 
+    def __getitem__(self, key):
+        raw = self._to_unsigned()
+        if isinstance(key, int):
+            return UInt[1]((raw >> key) & 1)
+        elif isinstance(key, slice):
+            # Verilog-style: val[msb:lsb]
+            msb = key.start
+            lsb = key.stop
+            if msb is None or lsb is None:
+                raise ValueError("Bit slice requires both MSB and LSB: val[msb:lsb]")
+            w = msb - lsb + 1
+            return UInt[w]((raw >> lsb) & ((1 << w) - 1))
+        raise TypeError(f"Invalid index type: {type(key)}")
+
+    def xor_reduce(self):
+        v = self._to_unsigned()
+        r = 0
+        for i in range(self._width):
+            r ^= (v >> i) & 1
+        return UInt[1](r)
+
+    def and_reduce(self):
+        mask = (1 << self._width) - 1
+        return UInt[1](1 if (self._to_unsigned() & mask) == mask else 0)
+
+    def or_reduce(self):
+        return UInt[1](1 if self._to_unsigned() != 0 else 0)
+
 
 class _IntTypeMeta(type):
     """Metaclass enabling UInt[N] subscript syntax with type caching."""
