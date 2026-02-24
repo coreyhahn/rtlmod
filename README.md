@@ -1,5 +1,8 @@
 # rtlmod
 
+[![CI](https://github.com/coreyhahn/rtlmod/actions/workflows/ci.yml/badge.svg)](https://github.com/coreyhahn/rtlmod/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 Numpy-like arbitrary-width integer types for Python RTL modeling. Write bit-accurate Verilog reference models without manual masking.
 
 ## Install
