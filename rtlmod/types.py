@@ -128,6 +128,50 @@ class _ArithmeticMixin:
     def or_reduce(self):
         return UInt[1](1 if self._to_unsigned() != 0 else 0)
 
+    # --- Resize and sign-extend ---
+
+    def resize(self, new_width: int, round: str = 'truncate'):
+        """Resize to new_width. round='truncate' (default) or 'saturate'."""
+        if round == 'truncate':
+            if self.signed:
+                return SInt[new_width](self._value)
+            return UInt[new_width](self._value)
+        elif round == 'saturate':
+            if self.signed:
+                max_val = (1 << (new_width - 1)) - 1
+                min_val = -(1 << (new_width - 1))
+                clamped = max(min_val, min(max_val, self._value))
+                return SInt[new_width](clamped)
+            else:
+                max_val = (1 << new_width) - 1
+                clamped = min(max_val, self._value)
+                return UInt[new_width](clamped)
+        raise ValueError(f"Unknown round mode: {round}")
+
+    def sign_extend(self, new_width: int):
+        """Sign-extend to new_width. Returns SInt."""
+        raw = self._to_unsigned()
+        if raw >= (1 << (self._width - 1)):
+            val = raw - (1 << self._width)
+        else:
+            val = raw
+        return SInt[new_width](val)
+
+    # --- Display properties ---
+
+    @property
+    def hex(self):
+        raw = self._to_unsigned()
+        hex_digits = (self._width + 3) // 4
+        prefix = "sh" if self.signed else "h"
+        return f"{self._width}'{prefix}{raw:0{hex_digits}x}"
+
+    @property
+    def bin(self):
+        raw = self._to_unsigned()
+        prefix = "sb" if self.signed else "b"
+        return f"{self._width}'{prefix}{raw:0{self._width}b}"
+
 
 class _IntTypeMeta(type):
     """Metaclass enabling UInt[N] subscript syntax with type caching."""
@@ -190,6 +234,9 @@ class _UIntScalar(_ArithmeticMixin):
 
     def __repr__(self) -> str:
         return f"UInt[{self._width}]({self._value})"
+
+    def __str__(self) -> str:
+        return f"u{self._width}'d{self._value}"
 
 
 class UInt(metaclass=_IntTypeMeta):
@@ -271,6 +318,9 @@ class _SIntScalar(_ArithmeticMixin):
 
     def __repr__(self) -> str:
         return f"SInt[{self._width}]({self._value})"
+
+    def __str__(self) -> str:
+        return f"s{self._width}'d{self._value}"
 
 
 class SInt(metaclass=_IntTypeMeta):
