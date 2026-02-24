@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import numpy as np
+
 
 class _ArithmeticMixin:
     """Shared arithmetic operators for UInt and SInt scalars.
@@ -255,6 +257,39 @@ class UInt(metaclass=_IntTypeMeta):
     @classmethod
     def _make_type(cls, width: int) -> type:
         mask = (1 << width) - 1
+        is_signed = False
+
+        def _array(cls_inner, data=None, shape=None):
+            from rtlmod.array import RtlArray
+
+            if data is not None:
+                np_data = np.array(data, dtype=np.int64)
+            elif shape is not None:
+                np_data = np.zeros(shape, dtype=np.int64)
+            else:
+                raise ValueError("Provide data or shape")
+            masked = np_data & mask
+            return RtlArray(masked, width, is_signed)
+
+        def _random(cls_inner, shape):
+            from rtlmod.array import RtlArray
+
+            np_data = np.random.randint(0, 1 << width, size=shape, dtype=np.int64)
+            masked = np_data & mask
+            return RtlArray(masked, width, is_signed)
+
+        def _arange(cls_inner, start, stop):
+            from rtlmod.array import RtlArray
+
+            np_data = np.arange(start, stop, dtype=np.int64) & mask
+            return RtlArray(np_data, width, is_signed)
+
+        def _from_numpy(cls_inner, np_array):
+            from rtlmod.array import RtlArray
+
+            np_data = np_array.astype(np.int64) & mask
+            return RtlArray(np_data, width, is_signed)
+
         new_cls = type(
             f"UInt[{width}]",
             (_UIntScalar,),
@@ -265,6 +300,11 @@ class UInt(metaclass=_IntTypeMeta):
                 # Class-level properties so UInt[8].width works
                 "width": width,
                 "signed": False,
+                # Array factory methods
+                "array": classmethod(_array),
+                "random": classmethod(_random),
+                "arange": classmethod(_arange),
+                "from_numpy": classmethod(_from_numpy),
             },
         )
         return new_cls
@@ -341,6 +381,41 @@ class SInt(metaclass=_IntTypeMeta):
         mask = (1 << width) - 1
         sign_bit = 1 << (width - 1)
         mod = 1 << width
+        is_signed = True
+
+        def _signed_mask(np_data):
+            """Apply unsigned mask then convert to signed interpretation."""
+            masked = np_data.astype(np.int64) & mask
+            return np.where(masked >= sign_bit, masked - mod, masked)
+
+        def _array(cls_inner, data=None, shape=None):
+            from rtlmod.array import RtlArray
+
+            if data is not None:
+                np_data = np.array(data, dtype=np.int64)
+            elif shape is not None:
+                np_data = np.zeros(shape, dtype=np.int64)
+            else:
+                raise ValueError("Provide data or shape")
+            return RtlArray(_signed_mask(np_data), width, is_signed)
+
+        def _random(cls_inner, shape):
+            from rtlmod.array import RtlArray
+
+            np_data = np.random.randint(0, 1 << width, size=shape, dtype=np.int64)
+            return RtlArray(_signed_mask(np_data), width, is_signed)
+
+        def _arange(cls_inner, start, stop):
+            from rtlmod.array import RtlArray
+
+            np_data = np.arange(start, stop, dtype=np.int64)
+            return RtlArray(_signed_mask(np_data), width, is_signed)
+
+        def _from_numpy(cls_inner, np_array):
+            from rtlmod.array import RtlArray
+
+            return RtlArray(_signed_mask(np_array), width, is_signed)
+
         new_cls = type(
             f"SInt[{width}]",
             (_SIntScalar,),
@@ -353,6 +428,11 @@ class SInt(metaclass=_IntTypeMeta):
                 # Class-level properties so SInt[16].width works
                 "width": width,
                 "signed": True,
+                # Array factory methods
+                "array": classmethod(_array),
+                "random": classmethod(_random),
+                "arange": classmethod(_arange),
+                "from_numpy": classmethod(_from_numpy),
             },
         )
         return new_cls
