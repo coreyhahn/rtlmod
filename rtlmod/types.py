@@ -3,6 +3,104 @@
 from __future__ import annotations
 
 
+class _ArithmeticMixin:
+    """Shared arithmetic operators for UInt and SInt scalars.
+
+    Implements Verilog-style width rules:
+    - add/sub: max(wa, wb) + 1
+    - mul: wa + wb
+    - subtraction always produces signed result
+    - if either operand is signed, result is signed (except sub, always signed)
+    - bitwise: max(wa, wb), signed only if both signed
+    - shifts: same width as left operand
+    """
+
+    def __add__(self, other):
+        if not _is_rtl_type(other):
+            return NotImplemented
+        s = self.signed or other.signed
+        w = max(self._width, other._width) + 1
+        return _make_result(self._to_int() + other._to_int(), w, s)
+
+    def __radd__(self, other):
+        if not _is_rtl_type(other):
+            return NotImplemented
+        return other.__add__(self)
+
+    def __sub__(self, other):
+        if not _is_rtl_type(other):
+            return NotImplemented
+        w = max(self._width, other._width) + 1
+        return _make_result(self._to_int() - other._to_int(), w, True)
+
+    def __rsub__(self, other):
+        if not _is_rtl_type(other):
+            return NotImplemented
+        return other.__sub__(self)
+
+    def __mul__(self, other):
+        if not _is_rtl_type(other):
+            return NotImplemented
+        s = self.signed or other.signed
+        w = self._width + other._width
+        return _make_result(self._to_int() * other._to_int(), w, s)
+
+    def __rmul__(self, other):
+        if not _is_rtl_type(other):
+            return NotImplemented
+        return other.__mul__(self)
+
+    def __lshift__(self, n):
+        return type(self)(self._to_int() << int(n))
+
+    def __rshift__(self, n):
+        return type(self)(self._to_int() >> int(n))
+
+    def __and__(self, other):
+        if not _is_rtl_type(other):
+            return NotImplemented
+        w = max(self._width, other._width)
+        s = self.signed and other.signed
+        return _make_result(self._to_unsigned() & other._to_unsigned(), w, s)
+
+    def __rand__(self, other):
+        if not _is_rtl_type(other):
+            return NotImplemented
+        return other.__and__(self)
+
+    def __or__(self, other):
+        if not _is_rtl_type(other):
+            return NotImplemented
+        w = max(self._width, other._width)
+        s = self.signed and other.signed
+        return _make_result(self._to_unsigned() | other._to_unsigned(), w, s)
+
+    def __ror__(self, other):
+        if not _is_rtl_type(other):
+            return NotImplemented
+        return other.__or__(self)
+
+    def __xor__(self, other):
+        if not _is_rtl_type(other):
+            return NotImplemented
+        w = max(self._width, other._width)
+        s = self.signed and other.signed
+        return _make_result(self._to_unsigned() ^ other._to_unsigned(), w, s)
+
+    def __rxor__(self, other):
+        if not _is_rtl_type(other):
+            return NotImplemented
+        return other.__xor__(self)
+
+    def __invert__(self):
+        return type(self)(~self._to_unsigned())
+
+    def __neg__(self):
+        if self.signed:
+            return type(self)(-self._value)
+        return SInt[self._width](-self._to_int())
+
+
 class _IntTypeMeta(type):
     """Metaclass enabling UInt[N] subscript syntax with type caching."""
 
@@ -21,7 +119,7 @@ class _IntTypeMeta(type):
         raise NotImplementedError
 
 
-class _UIntScalar:
+class _UIntScalar(_ArithmeticMixin):
     """Instance of a UInt[N] value."""
 
     __slots__ = ("_value",)
@@ -97,7 +195,7 @@ class UInt(metaclass=_IntTypeMeta):
         return new_cls
 
 
-class _SIntScalar:
+class _SIntScalar(_ArithmeticMixin):
     """Instance of a SInt[N] value (two's complement signed)."""
 
     __slots__ = ("_value",)
@@ -180,3 +278,19 @@ class SInt(metaclass=_IntTypeMeta):
             },
         )
         return new_cls
+
+
+# --- Helper functions for arithmetic operators ---
+# Defined after UInt/SInt so forward references resolve at call time.
+
+
+def _is_rtl_type(obj):
+    """Check if obj is a UInt or SInt scalar."""
+    return isinstance(obj, (_UIntScalar, _SIntScalar))
+
+
+def _make_result(value: int, width: int, signed: bool):
+    """Create a result value of the given width and signedness."""
+    if signed:
+        return SInt[width](value)
+    return UInt[width](value)
